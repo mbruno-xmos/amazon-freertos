@@ -44,7 +44,7 @@
 #include "mbedtls/pk_internal.h"
 #include "mbedtls/debug.h"
 #ifdef MBEDTLS_DEBUG_C
-    #define tlsDEBUG_VERBOSE    4
+    #define tlsDEBUG_VERBOSE    3
 #endif
 
 /* C runtime includes. */
@@ -246,6 +246,15 @@ static int prvCheckCertificate( void * pvCtx,
             }
         }
     }
+
+    /*
+     * ************ FOR TESTING *************
+     * TODO:
+     * This lets us test with a local TLS server.
+     * Should be removed at some point.
+     * **************************************
+     */
+    *pulFlags &= ~MBEDTLS_X509_BADCERT_CN_MISMATCH;
 
     return 0;
 }
@@ -801,11 +810,12 @@ BaseType_t TLS_Send( void * pvContext,
                 /* Sent data, so update the tally and keep looping. */
                 xWritten += ( size_t ) xResult;
             }
-            else if( 0 == xResult )
+            else if( 0 == xResult || -pdFREERTOS_ERRNO_ENOSPC == xResult )
             {
                 /* No data sent (and no error). The secure sockets
                  * API supports non-blocking send, so stop the loop but don't
                  * flag an error. */
+                xResult = 0;
                 break;
             }
             else if( MBEDTLS_ERR_SSL_WANT_WRITE != xResult )

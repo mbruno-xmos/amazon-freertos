@@ -627,51 +627,25 @@ static uint32_t prvMQTTSendCallback( void * pvSendContext,
     UBaseType_t uxBrokerNumber = ( UBaseType_t ) pvSendContext; /*lint !e923 The cast is ok as we passed the index of the client before. */
     int32_t lSendRetVal;
     uint32_t ulBytesSent = 0;
-    TimeOut_t xTimestamp;
-    TickType_t xTicksToWait = pdMS_TO_TICKS( mqttconfigTCP_SEND_TIMEOUT_MS );
 
     /* Broker number must be valid. */
     configASSERT( uxBrokerNumber < ( UBaseType_t ) mqttconfigMAX_BROKERS );
 
-    /* Record the timestamp when this function was called. */
-    vTaskSetTimeOutState( &( xTimestamp ) );
-
     /* Get the actual connection to the broker. */
     pxConnection = &( xMQTTConnections[ uxBrokerNumber ] );
 
-    /* Keep re-trying until timeout or any error
-     * other than SOCKETS_EWOULDBLOCK occurs. */
-    while( ulBytesSent < ulDataLength )
+    /* Try sending the data. */
+    lSendRetVal = SOCKETS_Send( pxConnection->xSocket,
+                                pucData,
+                                ( size_t ) ( ulDataLength ),
+                                0 );
+
+    /* A negative return value from SOCKETS_Send
+     * means some error occurred. */
+    if( lSendRetVal > 0 )
     {
-        /* Check for timeout and if timeout has occurred, stop retrying. */
-        if( xTaskCheckForTimeOut( &( xTimestamp ), &( xTicksToWait ) ) == pdTRUE )
-        {
-            break;
-        }
-
-        /* Try sending the remaining data. */
-        lSendRetVal = SOCKETS_Send( pxConnection->xSocket,
-                                    &( pucData[ ulBytesSent ] ),               /* Only send the remaining data. */
-                                    ( size_t ) ( ulDataLength - ulBytesSent ), /* Only send the remaining data. */
-                                    0 );
-
-        /* A negative return value from SOCKETS_Send
-         * means some error occurred. */
-        if( lSendRetVal < 0 )
-        {
-            /* Since the socket is non-blocking, send can return
-             * SOCKETS_EWOULDBLOCK, in which case we retry again until
-             * timeout. In case of any other error, we stop re-trying. */
-            if( lSendRetVal != SOCKETS_EWOULDBLOCK )
-            {
-                break;
-            }
-        }
-        else
-        {
-            /* Update the count of sent bytes. */
-            ulBytesSent += ( uint32_t ) lSendRetVal;
-        }
+        /* Update the count of sent bytes. */
+        ulBytesSent = ( uint32_t ) lSendRetVal;
     }
 
     return ulBytesSent;
@@ -962,12 +936,21 @@ static BaseType_t prvSetupConnection( const MQTTEventData_t * const pxEventData 
 
             if( xStatus == pdPASS )
             {
-                /* Do not block now onwards. */
+                /* Do not block on receives now onwards. */
                 ( void ) SOCKETS_SetSockOpt( pxConnection->xSocket,
                                              0 /* Unused. */,
                                              SOCKETS_SO_NONBLOCK,
                                              NULL /* Unused. */,
                                              0 /* Unused. */ );
+
+                TickType_t send_timeout = pdMS_TO_TICKS( mqttconfigTCP_SEND_TIMEOUT_MS );
+
+                /* Set timeout on sends */
+                ( void ) SOCKETS_SetSockOpt( pxConnection->xSocket,
+                                             0 /* Unused. */,
+                                             SOCKETS_SO_SNDTIMEO,
+                                             &send_timeout,
+                                             sizeof(send_timeout));
             }
             else
             {

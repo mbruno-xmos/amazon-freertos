@@ -55,7 +55,7 @@
 #define winSRTT_INCREMENT_CURRENT 	6
 #define	winSRTT_DECREMENT_NEW 		1
 #define winSRTT_DECREMENT_CURRENT 	7
-#define winSRTT_CAP_mS				50
+#define winSRTT_CAP_mS				300
 
 #if( ipconfigUSE_TCP_WIN == 1 )
 
@@ -210,7 +210,7 @@ extern void vListInsertGeneric( List_t * const pxList, ListItem_t * const pxNewL
 #endif
 
 /* Logging verbosity level. */
-BaseType_t xTCPWindowLoggingLevel = 0;
+BaseType_t xTCPWindowLoggingLevel = 1;
 
 #if( ipconfigUSE_TCP_WIN == 1 )
 	/* Some 32-bit arithmetic: comparing sequence numbers */

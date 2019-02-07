@@ -2578,15 +2578,36 @@ void vSocketWakeUpUser( FreeRTOS_Socket_t *pxSocket )
 					/* Has the timeout been reached? */
 					if( xTaskCheckForTimeOut( &xTimeOut, &xRemainingTime ) != pdFALSE )
 					{
+					    FreeRTOS_debug_printf( ( "FreeRTOS_send: timed out\n" ) );
 						break;
 					}
 				}
 
 				/* Go sleeping until down-stream events are received. */
-				xEventGroupWaitBits( pxSocket->xEventGroup, eSOCKET_SEND | eSOCKET_CLOSED,
+				FreeRTOS_debug_printf( ( "FreeRTOS_send: %u -> %lxip:%d: blocking\n",
+					pxSocket->usLocalPort,
+					pxSocket->u.xTCP.ulRemoteIP,
+					pxSocket->u.xTCP.usRemotePort ) );
+
+				EventBits_t events;
+				events = xEventGroupWaitBits( pxSocket->xEventGroup, eSOCKET_SEND | eSOCKET_CLOSED,
 					pdTRUE /*xClearOnExit*/, pdFALSE /*xWaitAllBits*/, xRemainingTime );
 
+				if ((events & eSOCKET_SEND) == eSOCKET_SEND) {
+					FreeRTOS_debug_printf( ( "FreeRTOS_send: %u -> %lxip:%d: unblocked\n",
+						pxSocket->usLocalPort,
+						pxSocket->u.xTCP.ulRemoteIP,
+						pxSocket->u.xTCP.usRemotePort ) );
+				}
+
 				xByteCount = ( BaseType_t ) uxStreamBufferGetSpace( pxSocket->u.xTCP.txStream );
+				if ((events & eSOCKET_SEND) == eSOCKET_SEND) {
+					FreeRTOS_debug_printf( ( "FreeRTOS_send: %u -> %lxip:%d: %d bytes available\n",
+						pxSocket->usLocalPort,
+						pxSocket->u.xTCP.ulRemoteIP,
+						pxSocket->u.xTCP.usRemotePort,
+						xByteCount) );
+				}
 			}
 
 			/* How much was actually sent? */
